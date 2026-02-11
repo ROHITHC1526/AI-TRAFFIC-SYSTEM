@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Vehicle GPS Sender</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    .card {
+      background: #1e293b;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>🚛 Vehicle GPS Tracking</h2>
+  <p>Vehicle ID: <b id="vehicleDisplay">TRUCK_1</b></p>
+  <div class="card">
+    <label for="truckInput">Truck ID (or set via ?truck_id=2 in URL):</label><br>
+    <input type="number" id="truckInput" min="1" max="999" value="1" style="padding: 8px; margin: 10px; width: 120px; border-radius: 4px; border: none;">
+    <button onclick="updateTruckID()">Update Truck ID</button>
+  </div>
+
+  <button onclick="startTracking()">Start Live GPS</button>
+
+  <div class="card" id="status">
+    Waiting for GPS permission...
+  </div>
+
+  <script>
+    let currentTruckID = "TRUCK_1";
+
+    // Get truck ID from URL parameter or use default
+    function initializeTruckID() {
+      const params = new URLSearchParams(window.location.search);
+      const urlTruckID = params.get("truck_id");
+      
+      if (urlTruckID) {
+        currentTruckID = "TRUCK_" + parseInt(urlTruckID);
+        document.getElementById("truckInput").value = parseInt(urlTruckID);
+      } else {
+        currentTruckID = "TRUCK_" + document.getElementById("truckInput").value;
+      }
+      
+      document.getElementById("vehicleDisplay").textContent = currentTruckID;
+    }
+
+    function updateTruckID() {
+      const truckNum = document.getElementById("truckInput").value;
+      currentTruckID = "TRUCK_" + parseInt(truckNum);
+      document.getElementById("vehicleDisplay").textContent = currentTruckID;
+      alert("Truck ID updated to: " + currentTruckID);
+    }
+
+    function startTracking() {
+      if (!navigator.geolocation) {
+        alert("Geolocation not supported");
+        return;
+      }
+
+      document.getElementById("status").innerHTML =
+        "📡 Waiting for GPS signal...";
+
+      navigator.geolocation.watchPosition(
+        function (position) {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const speed = position.coords.speed
+            ? (position.coords.speed * 3.6).toFixed(1)
+            : 20;
+
+          document.getElementById("status").innerHTML = `
+            🟢 GPS CONNECTED <br>
+            🆔 Vehicle: ${currentTruckID}<br>
+            📍 Latitude: ${lat}<br>
+            📍 Longitude: ${lon}<br>
+            🚗 Speed: ${speed} km/h
+          `;
+
+          sendToBackend(lat, lon, speed);
+        },
+        function (error) {
+          document.getElementById("status").innerHTML =
+            "🔴 GPS signal weak… retrying automatically";
+          console.error(error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 30000,
+          maximumAge: 0
+        }
+      );
+    }
+
+    function sendToBackend(lat, lon, speed) {
+      fetch("https://joaquina-webbier-dena.ngrok-free.dev/api/location", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          vehicle_id: currentTruckID,
+          road_id: "REAL_GPS_ROUTE",
+          lat: lat,
+          long: lon,
+          speed: speed
+        })
+      });
+    }
+
+    // Initialize on page load
+    window.onload = initializeTruckID;
+  </script>
+
+</body>
+</html>
